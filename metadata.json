@@ -1,0 +1,6 @@
+{
+  "name": "ThermoChem Bench",
+  "description": "Interactive mechanical and chemical engineering calculation workbench featuring 10 live parametric diagrams, tabular outputs, and technical fine-print tooltips.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
