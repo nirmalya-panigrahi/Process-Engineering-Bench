@@ -1,5 +1,6 @@
 import type {TttResult} from '../../engines/tttDiagram';
 import {
+  ChartCursorTooltip,
   ChartFrame,
   createInverseLinearMapper,
   createInverseLogMapper,
@@ -35,12 +36,32 @@ export function TttDiagramChart({result, finePrint}: TttDiagramChartProps) {
 
   const {grade, startCurve, finishCurve, pathPoints} = result;
 
+  const cursorTooltipRows = cursor
+    ? (() => {
+        const tVal = invX(cursor.svgX);
+        const tempVal = invY(cursor.svgY);
+        const tFormatted = tVal >= 100 ? tVal.toFixed(0) : tVal >= 10 ? tVal.toFixed(1) : tVal.toFixed(2);
+        return [
+          {label: 'Time t', value: `${tFormatted} s`},
+          {label: 'Temp T', value: `${tempVal.toFixed(0)} °C`},
+          {label: 'Nose', value: `${grade.noseTimeS} s @ ${grade.noseTempC} °C`},
+          {label: 'M_s / A₁', value: `${grade.msC} / ${grade.a1C} °C`},
+        ];
+      })()
+    : [];
+
   return (
     <ChartFrame
       title={`Time–Temperature–Transformation (TTT) Diagram — ${grade.name}`}
       subtitle="Logarithmic transformation C-curves, martensite start/finish, and heat-treatment trajectory"
       finePrintTitle="TTT Transformation Kinetics"
       finePrintBody={finePrint}
+      finePrintDataValues={[
+        {label: 'Steel Grade', value: grade.name},
+        {label: 'Nose', value: `${grade.noseTimeS} s @ ${grade.noseTempC} °C`},
+        {label: 'Critical (A₁ / B_s)', value: `${grade.a1C} / ${grade.bsC} °C`},
+        {label: 'Martensite (M_s / M₉₀)', value: `${grade.msC} / ${grade.m90C} °C`},
+      ]}
       crosshairReadout={readout}
       legend={
         <>
@@ -169,6 +190,16 @@ export function TttDiagramChart({result, finePrint}: TttDiagramChartProps) {
           Temperature (°C)
         </text>
       </svg>
+      {cursor && (
+        <ChartCursorTooltip
+          svgX={cursor.svgX}
+          svgY={cursor.svgY}
+          viewWidth={W}
+          viewHeight={H}
+          title="TTT Kinetics Probe"
+          rows={cursorTooltipRows}
+        />
+      )}
     </ChartFrame>
   );
 }

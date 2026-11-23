@@ -1,5 +1,6 @@
 import type {PumpHeadResult} from '../../engines/pumpHead';
 import {
+  ChartCursorTooltip,
   ChartFrame,
   createInverseLinearMapper,
   createLinearMapper,
@@ -56,12 +57,43 @@ export function PumpHeadChart({result, finePrint}: PumpHeadChartProps) {
 
   const fracTicks = [0, 0.25, 0.5, 0.75, 1];
 
+  const cursorTooltipRows = cursor
+    ? (() => {
+        const qVal = Math.max(0, Math.min(qMax, invX(cursor.svgX)));
+        const t = (qVal / (qMax || 1)) * (pts.length - 1);
+        const i0 = Math.min(pts.length - 1, Math.max(0, Math.floor(t)));
+        const i1 = Math.min(pts.length - 1, i0 + 1);
+        const frac = t - i0;
+        const p0 = pts[i0];
+        const p1 = pts[i1];
+        const hPump = p0.hPumpM + frac * (p1.hPumpM - p0.hPumpM);
+        const hSys = p0.hSysM + frac * (p1.hSysM - p0.hSysM);
+        const eta = p0.etaPct + frac * (p1.etaPct - p0.etaPct);
+        return [
+          {label: 'Flow Q', value: `${qVal.toFixed(1)} m³/h`},
+          {label: 'Pump Head', value: `${hPump.toFixed(1)} m`},
+          {label: 'System Head', value: `${hSys.toFixed(1)} m`},
+          {label: 'Efficiency η', value: `${eta.toFixed(1)} %`},
+        ];
+      })()
+    : [];
+
   return (
     <ChartFrame
       title="Pump Performance & System Resistance Curve (H–Q)"
       subtitle="Affinity-scaled pump head curve intersecting piping friction curve with efficiency overlay"
       finePrintTitle="Pump & System Curve Matching"
       finePrintBody={finePrint}
+      finePrintDataValues={
+        op
+          ? [
+              {label: 'Duty Flow Q_op', value: `${op.qOpM3h.toFixed(1)} m³/h`},
+              {label: 'Duty Head H_op', value: `${op.hOpM.toFixed(2)} m`},
+              {label: 'Efficiency η_op', value: `${op.etaOpPct.toFixed(1)} %`},
+              {label: 'Shaft Power', value: `${op.powerKw.toFixed(2)} kW`},
+            ]
+          : undefined
+      }
       crosshairReadout={readout}
       legend={
         <>
@@ -217,6 +249,16 @@ export function PumpHeadChart({result, finePrint}: PumpHeadChartProps) {
           Pump Efficiency η (%)
         </text>
       </svg>
+      {cursor && (
+        <ChartCursorTooltip
+          svgX={cursor.svgX}
+          svgY={cursor.svgY}
+          viewWidth={W}
+          viewHeight={H}
+          title="Pump Curve Probe"
+          rows={cursorTooltipRows}
+        />
+      )}
     </ChartFrame>
   );
 }

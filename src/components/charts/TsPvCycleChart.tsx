@@ -1,6 +1,8 @@
 import type {PowerCycleResult} from '../../engines/powerCycles';
 import {
+  ChartCursorTooltip,
   ChartFrame,
+  createInverseLinearMapper,
   createLinearMapper,
   pointsToPolyline,
   useSvgCrosshair,
@@ -49,12 +51,56 @@ export function TsPvCycleChart({result, finePrint}: TsPvCycleChartProps) {
 
   const mapVx = createLinearMapper(vMin, vMax, M.left, W - M.right);
   const mapPy = createLinearMapper(pMin, pMax, H - M.bottom, M.top);
+  const invVx = createInverseLinearMapper(vMin, vMax, M.left, W - M.right);
+  const invPy = createInverseLinearMapper(pMin, pMax, H - M.bottom, M.top);
 
   const mapSx = createLinearMapper(sMin, sMax, M.left, W - M.right);
   const mapTy = createLinearMapper(tMin, tMax, H - M.bottom, M.top);
+  const invSx = createInverseLinearMapper(sMin, sMax, M.left, W - M.right);
+  const invTy = createInverseLinearMapper(tMin, tMax, H - M.bottom, M.top);
 
   const pvPoly = pointsToPolyline([...pts, pts[0]].map((p) => ({x: mapVx(p.vM3Kg), y: mapPy(p.pKpa)})));
   const tsPoly = pointsToPolyline([...pts, pts[0]].map((p) => ({x: mapSx(p.sKjKgK), y: mapTy(p.tK)})));
+
+  const pvTooltipRows = pvCross.cursor
+    ? (() => {
+        const vVal = invVx(pvCross.cursor.svgX);
+        const pVal = invPy(pvCross.cursor.svgY);
+        const near = states.find(
+          (st) => Math.hypot(mapVx(st.vM3Kg) - pvCross.cursor!.svgX, mapPy(st.pKpa) - pvCross.cursor!.svgY) < 22,
+        );
+        return [
+          {label: 'Volume v', value: `${vVal.toFixed(3)} m³/kg`},
+          {label: 'Pressure P', value: `${pVal.toFixed(0)} kPa`},
+          ...(near
+            ? [
+                {label: `State ${near.id} T`, value: `${near.tK.toFixed(0)} K`},
+                {label: `State ${near.id} P`, value: `${near.pKpa.toFixed(0)} kPa`},
+              ]
+            : []),
+        ];
+      })()
+    : [];
+
+  const tsTooltipRows = tsCross.cursor
+    ? (() => {
+        const sVal = invSx(tsCross.cursor.svgX);
+        const tVal = invTy(tsCross.cursor.svgY);
+        const near = states.find(
+          (st) => Math.hypot(mapSx(st.sKjKgK) - tsCross.cursor!.svgX, mapTy(st.tK) - tsCross.cursor!.svgY) < 22,
+        );
+        return [
+          {label: 'Entropy s', value: `${sVal.toFixed(3)} kJ/kg·K`},
+          {label: 'Temp T', value: `${tVal.toFixed(0)} K`},
+          ...(near
+            ? [
+                {label: `State ${near.id} T`, value: `${near.tK.toFixed(0)} K`},
+                {label: `State ${near.id} P`, value: `${near.pKpa.toFixed(0)} kPa`},
+              ]
+            : []),
+        ];
+      })()
+    : [];
 
   return (
     <ChartFrame
@@ -62,6 +108,10 @@ export function TsPvCycleChart({result, finePrint}: TsPvCycleChartProps) {
       subtitle="Enclosed loop area on both planes equals specific net cycle work"
       finePrintTitle="Power Cycle Loop Equivalence"
       finePrintBody={finePrint}
+      finePrintDataValues={states.map((st) => ({
+        label: `State ${st.id}`,
+        value: `${st.tK.toFixed(0)} K · ${st.pKpa.toFixed(0)} kPa`,
+      }))}
       legend={
         <>
           <span className="inline-flex items-center gap-1.5">
@@ -80,62 +130,74 @@ export function TsPvCycleChart({result, finePrint}: TsPvCycleChartProps) {
           <div className="px-1 pb-1 font-mono text-[11px] font-semibold text-slate-700">
             P–v Plane (Pressure vs. Specific Volume)
           </div>
-          <svg
-            viewBox={`0 0 ${W} ${H}`}
-            role="img"
-            aria-label="Pressure versus specific volume cycle diagram"
-            className="w-full h-auto cursor-crosshair select-none"
-            onMouseMove={pvCross.onMouseMove}
-            onMouseLeave={pvCross.onMouseLeave}
-          >
-            {[0.25, 0.5, 0.75, 1].map((f) => {
-              const vVal = vMin + f * (vMax - vMin);
-              const pVal = pMin + f * (pMax - pMin);
-              return (
-                <g key={f}>
-                  <line x1={mapVx(vVal)} y1={M.top} x2={mapVx(vVal)} y2={H - M.bottom} stroke="#E2E8F0" />
-                  <text x={mapVx(vVal)} y={H - M.bottom + 15} textAnchor="middle" className="fill-slate-500 font-mono text-[9px]">
-                    {vVal.toFixed(2)}
-                  </text>
-                  <line x1={M.left} y1={mapPy(pVal)} x2={W - M.right} y2={mapPy(pVal)} stroke="#E2E8F0" />
-                  <text x={M.left - 6} y={mapPy(pVal) + 3} textAnchor="end" className="fill-slate-500 font-mono text-[9px]">
-                    {pVal.toFixed(0)}
+          <div className="relative">
+            <svg
+              viewBox={`0 0 ${W} ${H}`}
+              role="img"
+              aria-label="Pressure versus specific volume cycle diagram"
+              className="w-full h-auto cursor-crosshair select-none"
+              onMouseMove={pvCross.onMouseMove}
+              onMouseLeave={pvCross.onMouseLeave}
+            >
+              {[0.25, 0.5, 0.75, 1].map((f) => {
+                const vVal = vMin + f * (vMax - vMin);
+                const pVal = pMin + f * (pMax - pMin);
+                return (
+                  <g key={f}>
+                    <line x1={mapVx(vVal)} y1={M.top} x2={mapVx(vVal)} y2={H - M.bottom} stroke="#E2E8F0" />
+                    <text x={mapVx(vVal)} y={H - M.bottom + 15} textAnchor="middle" className="fill-slate-500 font-mono text-[9px]">
+                      {vVal.toFixed(2)}
+                    </text>
+                    <line x1={M.left} y1={mapPy(pVal)} x2={W - M.right} y2={mapPy(pVal)} stroke="#E2E8F0" />
+                    <text x={M.left - 6} y={mapPy(pVal) + 3} textAnchor="end" className="fill-slate-500 font-mono text-[9px]">
+                      {pVal.toFixed(0)}
+                    </text>
+                  </g>
+                );
+              })}
+
+              <polygon points={pvPoly} fill="#2563EB" fillOpacity={0.12} stroke="#2563EB" strokeWidth={2.25} />
+              {states.map((st) => (
+                <g key={`pv-${st.id}`}>
+                  <circle cx={mapVx(st.vM3Kg)} cy={mapPy(st.pKpa)} r={4.5} fill="#1E40AF" stroke="#FFF" strokeWidth={1.5} />
+                  <text x={mapVx(st.vM3Kg) + 7} y={mapPy(st.pKpa) - 5} className="fill-slate-900 font-mono text-[10px] font-semibold">
+                    {st.id}
                   </text>
                 </g>
-              );
-            })}
+              ))}
 
-            <polygon points={pvPoly} fill="#2563EB" fillOpacity={0.12} stroke="#2563EB" strokeWidth={2.25} />
-            {states.map((st) => (
-              <g key={`pv-${st.id}`}>
-                <circle cx={mapVx(st.vM3Kg)} cy={mapPy(st.pKpa)} r={4.5} fill="#1E40AF" stroke="#FFF" strokeWidth={1.5} />
-                <text x={mapVx(st.vM3Kg) + 7} y={mapPy(st.pKpa) - 5} className="fill-slate-900 font-mono text-[10px] font-semibold">
-                  {st.id}
-                </text>
-              </g>
-            ))}
+              {pvCross.cursor && (
+                <g pointerEvents="none">
+                  <line x1={pvCross.cursor.svgX} y1={M.top} x2={pvCross.cursor.svgX} y2={H - M.bottom} stroke="#64748B" strokeDasharray="2 2" />
+                  <line x1={M.left} y1={pvCross.cursor.svgY} x2={W - M.right} y2={pvCross.cursor.svgY} stroke="#64748B" strokeDasharray="2 2" />
+                </g>
+              )}
 
+              <rect x={M.left} y={M.top} width={W - M.left - M.right} height={H - M.top - M.bottom} fill="none" stroke="#94A3B8" />
+              <text x={(M.left + W - M.right) / 2} y={H - 8} textAnchor="middle" className="fill-slate-600 text-[10px] font-medium">
+                Specific Volume v (m³/kg)
+              </text>
+              <text
+                x={14}
+                y={(M.top + H - M.bottom) / 2}
+                textAnchor="middle"
+                transform={`rotate(-90 14 ${(M.top + H - M.bottom) / 2})`}
+                className="fill-slate-600 text-[10px] font-medium"
+              >
+                Pressure P (kPa)
+              </text>
+            </svg>
             {pvCross.cursor && (
-              <g pointerEvents="none">
-                <line x1={pvCross.cursor.svgX} y1={M.top} x2={pvCross.cursor.svgX} y2={H - M.bottom} stroke="#64748B" strokeDasharray="2 2" />
-                <line x1={M.left} y1={pvCross.cursor.svgY} x2={W - M.right} y2={pvCross.cursor.svgY} stroke="#64748B" strokeDasharray="2 2" />
-              </g>
+              <ChartCursorTooltip
+                svgX={pvCross.cursor.svgX}
+                svgY={pvCross.cursor.svgY}
+                viewWidth={W}
+                viewHeight={H}
+                title="P–v Plane Probe"
+                rows={pvTooltipRows}
+              />
             )}
-
-            <rect x={M.left} y={M.top} width={W - M.left - M.right} height={H - M.top - M.bottom} fill="none" stroke="#94A3B8" />
-            <text x={(M.left + W - M.right) / 2} y={H - 8} textAnchor="middle" className="fill-slate-600 text-[10px] font-medium">
-              Specific Volume v (m³/kg)
-            </text>
-            <text
-              x={14}
-              y={(M.top + H - M.bottom) / 2}
-              textAnchor="middle"
-              transform={`rotate(-90 14 ${(M.top + H - M.bottom) / 2})`}
-              className="fill-slate-600 text-[10px] font-medium"
-            >
-              Pressure P (kPa)
-            </text>
-          </svg>
+          </div>
         </div>
 
         {/* T-s plot */}
@@ -143,62 +205,74 @@ export function TsPvCycleChart({result, finePrint}: TsPvCycleChartProps) {
           <div className="px-1 pb-1 font-mono text-[11px] font-semibold text-slate-700">
             T–s Plane (Temperature vs. Entropy)
           </div>
-          <svg
-            viewBox={`0 0 ${W} ${H}`}
-            role="img"
-            aria-label="Temperature versus entropy cycle diagram"
-            className="w-full h-auto cursor-crosshair select-none"
-            onMouseMove={tsCross.onMouseMove}
-            onMouseLeave={tsCross.onMouseLeave}
-          >
-            {[0.2, 0.4, 0.6, 0.8].map((f) => {
-              const sVal = sMin + f * (sMax - sMin);
-              const tVal = tMin + f * (tMax - tMin);
-              return (
-                <g key={f}>
-                  <line x1={mapSx(sVal)} y1={M.top} x2={mapSx(sVal)} y2={H - M.bottom} stroke="#E2E8F0" />
-                  <text x={mapSx(sVal)} y={H - M.bottom + 15} textAnchor="middle" className="fill-slate-500 font-mono text-[9px]">
-                    {sVal.toFixed(2)}
-                  </text>
-                  <line x1={M.left} y1={mapTy(tVal)} x2={W - M.right} y2={mapTy(tVal)} stroke="#E2E8F0" />
-                  <text x={M.left - 6} y={mapTy(tVal) + 3} textAnchor="end" className="fill-slate-500 font-mono text-[9px]">
-                    {tVal.toFixed(0)}
+          <div className="relative">
+            <svg
+              viewBox={`0 0 ${W} ${H}`}
+              role="img"
+              aria-label="Temperature versus entropy cycle diagram"
+              className="w-full h-auto cursor-crosshair select-none"
+              onMouseMove={tsCross.onMouseMove}
+              onMouseLeave={tsCross.onMouseLeave}
+            >
+              {[0.2, 0.4, 0.6, 0.8].map((f) => {
+                const sVal = sMin + f * (sMax - sMin);
+                const tVal = tMin + f * (tMax - tMin);
+                return (
+                  <g key={f}>
+                    <line x1={mapSx(sVal)} y1={M.top} x2={mapSx(sVal)} y2={H - M.bottom} stroke="#E2E8F0" />
+                    <text x={mapSx(sVal)} y={H - M.bottom + 15} textAnchor="middle" className="fill-slate-500 font-mono text-[9px]">
+                      {sVal.toFixed(2)}
+                    </text>
+                    <line x1={M.left} y1={mapTy(tVal)} x2={W - M.right} y2={mapTy(tVal)} stroke="#E2E8F0" />
+                    <text x={M.left - 6} y={mapTy(tVal) + 3} textAnchor="end" className="fill-slate-500 font-mono text-[9px]">
+                      {tVal.toFixed(0)}
+                    </text>
+                  </g>
+                );
+              })}
+
+              <polygon points={tsPoly} fill="#E11D48" fillOpacity={0.12} stroke="#E11D48" strokeWidth={2.25} />
+              {states.map((st) => (
+                <g key={`ts-${st.id}`}>
+                  <circle cx={mapSx(st.sKjKgK)} cy={mapTy(st.tK)} r={4.5} fill="#BE123C" stroke="#FFF" strokeWidth={1.5} />
+                  <text x={mapSx(st.sKjKgK) + 7} y={mapTy(st.tK) - 5} className="fill-slate-900 font-mono text-[10px] font-semibold">
+                    {st.id}
                   </text>
                 </g>
-              );
-            })}
+              ))}
 
-            <polygon points={tsPoly} fill="#E11D48" fillOpacity={0.12} stroke="#E11D48" strokeWidth={2.25} />
-            {states.map((st) => (
-              <g key={`ts-${st.id}`}>
-                <circle cx={mapSx(st.sKjKgK)} cy={mapTy(st.tK)} r={4.5} fill="#BE123C" stroke="#FFF" strokeWidth={1.5} />
-                <text x={mapSx(st.sKjKgK) + 7} y={mapTy(st.tK) - 5} className="fill-slate-900 font-mono text-[10px] font-semibold">
-                  {st.id}
-                </text>
-              </g>
-            ))}
+              {tsCross.cursor && (
+                <g pointerEvents="none">
+                  <line x1={tsCross.cursor.svgX} y1={M.top} x2={tsCross.cursor.svgX} y2={H - M.bottom} stroke="#64748B" strokeDasharray="2 2" />
+                  <line x1={M.left} y1={tsCross.cursor.svgY} x2={W - M.right} y2={tsCross.cursor.svgY} stroke="#64748B" strokeDasharray="2 2" />
+                </g>
+              )}
 
+              <rect x={M.left} y={M.top} width={W - M.left - M.right} height={H - M.top - M.bottom} fill="none" stroke="#94A3B8" />
+              <text x={(M.left + W - M.right) / 2} y={H - 8} textAnchor="middle" className="fill-slate-600 text-[10px] font-medium">
+                Specific Entropy s (kJ/kg·K)
+              </text>
+              <text
+                x={14}
+                y={(M.top + H - M.bottom) / 2}
+                textAnchor="middle"
+                transform={`rotate(-90 14 ${(M.top + H - M.bottom) / 2})`}
+                className="fill-slate-600 text-[10px] font-medium"
+              >
+                Temperature T (K)
+              </text>
+            </svg>
             {tsCross.cursor && (
-              <g pointerEvents="none">
-                <line x1={tsCross.cursor.svgX} y1={M.top} x2={tsCross.cursor.svgX} y2={H - M.bottom} stroke="#64748B" strokeDasharray="2 2" />
-                <line x1={M.left} y1={tsCross.cursor.svgY} x2={W - M.right} y2={tsCross.cursor.svgY} stroke="#64748B" strokeDasharray="2 2" />
-              </g>
+              <ChartCursorTooltip
+                svgX={tsCross.cursor.svgX}
+                svgY={tsCross.cursor.svgY}
+                viewWidth={W}
+                viewHeight={H}
+                title="T–s Plane Probe"
+                rows={tsTooltipRows}
+              />
             )}
-
-            <rect x={M.left} y={M.top} width={W - M.left - M.right} height={H - M.top - M.bottom} fill="none" stroke="#94A3B8" />
-            <text x={(M.left + W - M.right) / 2} y={H - 8} textAnchor="middle" className="fill-slate-600 text-[10px] font-medium">
-              Specific Entropy s (kJ/kg·K)
-            </text>
-            <text
-              x={14}
-              y={(M.top + H - M.bottom) / 2}
-              textAnchor="middle"
-              transform={`rotate(-90 14 ${(M.top + H - M.bottom) / 2})`}
-              className="fill-slate-600 text-[10px] font-medium"
-            >
-              Temperature T (K)
-            </text>
-          </svg>
+          </div>
         </div>
       </div>
     </ChartFrame>

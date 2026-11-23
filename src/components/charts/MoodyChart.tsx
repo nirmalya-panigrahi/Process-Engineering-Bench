@@ -1,5 +1,6 @@
-import type {MoodyResult} from '../../engines/moody';
+import {darcyFrictionFactor, type MoodyResult} from '../../engines/moody';
 import {
+  ChartCursorTooltip,
   ChartFrame,
   createInverseLogMapper,
   createLogMapper,
@@ -35,12 +36,37 @@ export function MoodyChart({result, finePrint}: MoodyChartProps) {
 
   const op = result.operatingPoint;
 
+  const cursorTooltipRows = cursor
+    ? (() => {
+        const reVal = invX(cursor.svgX);
+        const fCursor = invY(cursor.svgY);
+        const relR = op ? op.relRoughness : 0.00045;
+        const fCurve = darcyFrictionFactor(reVal, relR);
+        return [
+          {label: 'Reynolds Re', value: reVal.toExponential(2)},
+          {label: 'Cursor f', value: fCursor.toFixed(5)},
+          {label: 'Pipe Curve f', value: fCurve.toFixed(5)},
+          {label: 'Rel. Rough ε/D', value: relR.toExponential(2)},
+        ];
+      })()
+    : [];
+
   return (
     <ChartFrame
       title="Moody Friction Factor Chart (Log–Log)"
       subtitle="Darcy–Weisbach friction factor f vs. Reynolds number and relative roughness ε/D"
       finePrintTitle="Moody Diagram Basis"
       finePrintBody={finePrint}
+      finePrintDataValues={
+        op
+          ? [
+              {label: 'Reynolds Re', value: op.re.toExponential(2)},
+              {label: 'Darcy f', value: op.f.toFixed(5)},
+              {label: 'ε/D', value: op.relRoughness.toExponential(3)},
+              {label: 'Regime', value: op.regime},
+            ]
+          : undefined
+      }
       crosshairReadout={readout}
       legend={
         <>
@@ -265,6 +291,16 @@ export function MoodyChart({result, finePrint}: MoodyChartProps) {
           Relative Roughness ε/D
         </text>
       </svg>
+      {cursor && (
+        <ChartCursorTooltip
+          svgX={cursor.svgX}
+          svgY={cursor.svgY}
+          viewWidth={W}
+          viewHeight={H}
+          title="Moody Probe"
+          rows={cursorTooltipRows}
+        />
+      )}
     </ChartFrame>
   );
 }

@@ -95,6 +95,7 @@ export function InputPanel({
           const val = inputs[field.id];
 
           if (field.type === 'select' && field.options) {
+            const activeOption = field.options.find((opt) => opt.value === String(val));
             return (
               <div key={field.id} className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
@@ -107,6 +108,9 @@ export function InputPanel({
                   <FinePrintTooltip
                     title={`${field.label} (${field.symbol})`}
                     content={field.finePrint}
+                    dataValues={[
+                      {label: 'Active Selection', value: activeOption?.label ?? String(val)},
+                    ]}
                     align="right"
                   />
                 </div>
@@ -130,6 +134,16 @@ export function InputPanel({
           const numericVal = Number(val);
           const isError = fieldIssue?.severity === 'error';
           const isWarn = fieldIssue?.severity === 'warning';
+          const unitSuffix = field.unit ? ` ${field.unit}` : '';
+          const inputTooltipData = [
+            {
+              label: 'Current Input',
+              value: Number.isFinite(numericVal) ? `${numericVal}${unitSuffix}` : 'Invalid / Empty',
+            },
+            ...(field.min !== undefined && field.max !== undefined
+              ? [{label: 'Valid Bounds', value: `${field.min} – ${field.max}${unitSuffix}`}]
+              : []),
+          ];
 
           return (
             <div key={field.id} className="space-y-1.5">
@@ -149,6 +163,7 @@ export function InputPanel({
                   <FinePrintTooltip
                     title={`${field.label} (${field.symbol})`}
                     content={field.finePrint}
+                    dataValues={inputTooltipData}
                     align="right"
                   />
                 </div>

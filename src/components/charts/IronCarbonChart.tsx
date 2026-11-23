@@ -1,5 +1,10 @@
-import type {IronCarbonResult} from '../../engines/ironCarbon';
 import {
+  liquidusTemp,
+  solidusTemp,
+  type IronCarbonResult,
+} from '../../engines/ironCarbon';
+import {
+  ChartCursorTooltip,
   ChartFrame,
   createInverseLinearMapper,
   createLinearMapper,
@@ -34,12 +39,42 @@ export function IronCarbonChart({result, finePrint}: IronCarbonChartProps) {
 
   const pt = (c: number, t: number) => `${mapX(c).toFixed(1)},${mapY(t).toFixed(1)}`;
 
+  const cursorTooltipRows = cursor
+    ? (() => {
+        const cVal = Math.max(0, Math.min(6.67, invX(cursor.svgX)));
+        const tVal = invY(cursor.svgY);
+        return [
+          {label: 'Carbon wt%', value: `${cVal.toFixed(2)} %`},
+          {label: 'Temperature', value: `${tVal.toFixed(0)} °C`},
+          {label: 'Liquidus T_L', value: `${liquidusTemp(cVal).toFixed(0)} °C`},
+          {label: 'Solidus T_S', value: `${solidusTemp(cVal).toFixed(0)} °C`},
+        ];
+      })()
+    : [];
+
   return (
     <ChartFrame
       title="Iron–Carbon (Fe–Fe₃C) Equilibrium Phase Diagram"
       subtitle="Metastable steel and cast iron phase fields with active Lever Rule tie-line"
       finePrintTitle="Fe–Fe₃C Invariant Reactions"
       finePrintBody={finePrint}
+      finePrintDataValues={
+        result.point
+          ? [
+              {label: 'Alloy', value: `${result.point.c.toFixed(2)}% C @ ${result.point.t.toFixed(0)} °C`},
+              {label: 'Class', value: result.alloyClass},
+              {label: 'Phases', value: result.phaseRegion},
+              ...(result.tieLine
+                ? [
+                    {
+                      label: 'Lever Split',
+                      value: `${result.tieLine.leftPct.toFixed(1)}% / ${result.tieLine.rightPct.toFixed(1)}%`,
+                    },
+                  ]
+                : []),
+            ]
+          : undefined
+      }
       crosshairReadout={readout}
       legend={
         <>
@@ -202,6 +237,16 @@ export function IronCarbonChart({result, finePrint}: IronCarbonChartProps) {
           Temperature (°C)
         </text>
       </svg>
+      {cursor && (
+        <ChartCursorTooltip
+          svgX={cursor.svgX}
+          svgY={cursor.svgY}
+          viewWidth={W}
+          viewHeight={H}
+          title="Fe–Fe₃C Phase Probe"
+          rows={cursorTooltipRows}
+        />
+      )}
     </ChartFrame>
   );
 }

@@ -79,6 +79,21 @@ export function OutputReadoutGrid({
                 <FinePrintTooltip
                   title={`${metric.label} (${metric.symbol})`}
                   content={metric.finePrint}
+                  dataValues={[
+                    {
+                      label: 'Computed Value',
+                      value: `${metric.formatted}${metric.unit ? ` ${metric.unit}` : ''}`,
+                    },
+                    ...(typeof metric.value === 'number' && Number.isFinite(metric.value)
+                      ? [
+                          {
+                            label: 'High Precision',
+                            value: `${metric.value.toPrecision(6)}${metric.unit ? ` ${metric.unit}` : ''}`,
+                          },
+                        ]
+                      : []),
+                    ...(metric.statusLabel ? [{label: 'Status', value: metric.statusLabel}] : []),
+                  ]}
                   align="right"
                 />
               </div>

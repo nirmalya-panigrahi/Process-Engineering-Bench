@@ -43,7 +43,7 @@ describe('ThermoChem Bench — Integration Flows (Blue Pill & Red Pill)', () => 
     expect(screen.getByRole('heading', {name: 'Iron–Carbon Phase Diagram'})).toBeInTheDocument();
   });
 
-  it('displays accessible fine-print tooltips on click/focus and dismisses with Escape', async () => {
+  it('displays accessible fine-print tooltips with live data values and dismisses with Escape', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -51,10 +51,44 @@ describe('ThermoChem Bench — Integration Flows (Blue Pill & Red Pill)', () => 
     await user.click(infoBtn);
 
     const tooltip = screen.getByRole('tooltip');
+    expect(tooltip).toHaveTextContent(/Current Input/i);
+    expect(tooltip).toHaveTextContent(/24 °C/i);
     expect(tooltip).toHaveTextContent(/shielded thermometer/i);
 
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+
+    // Check output metric tooltip includes Computed Value and High Precision
+    const outputInfoBtn = screen.getByRole('button', {name: /Fine print for Wet-Bulb Temperature/i});
+    await user.click(outputInfoBtn);
+    const outTooltip = screen.getByRole('tooltip');
+    expect(outTooltip).toHaveTextContent(/Computed Value/i);
+    expect(outTooltip).toHaveTextContent(/High Precision/i);
+  });
+
+  it('displays floating chart tooltip with interpolated data values on pointer hover', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const chartSvg = screen.getByRole('img', {name: /psychrometric chart/i});
+    chartSvg.getBoundingClientRect = () =>
+      ({
+        left: 0,
+        top: 0,
+        width: 720,
+        height: 430,
+        right: 720,
+        bottom: 430,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      }) as DOMRect;
+
+    await user.pointer({target: chartSvg, coords: {clientX: 360, clientY: 220}});
+    const probeTooltip = screen.getByRole('status');
+    expect(probeTooltip).toHaveTextContent(/Probe Air State/i);
+    expect(probeTooltip).toHaveTextContent(/Dry-Bulb T_db/i);
+    expect(probeTooltip).toHaveTextContent(/Enthalpy h/i);
   });
 
   it('Red Pill: displays validation alert and disables Export CSV on invalid physical input', async () => {

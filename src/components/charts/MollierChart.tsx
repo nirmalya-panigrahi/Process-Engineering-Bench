@@ -1,5 +1,6 @@
 import type {MollierResult} from '../../engines/mollier';
 import {
+  ChartCursorTooltip,
   ChartFrame,
   createInverseLinearMapper,
   createLinearMapper,
@@ -39,12 +40,38 @@ export function MollierChart({result, finePrint}: MollierChartProps) {
   const sTicks = [4, 5, 6, 7, 8, 9];
   const hTicks = [1600, 2000, 2400, 2800, 3200, 3600];
 
+  const cursorTooltipRows = cursor
+    ? [
+        {label: 'Entropy s', value: `${invX(cursor.svgX).toFixed(3)} kJ/kg·K`},
+        {label: 'Enthalpy h', value: `${invY(cursor.svgY).toFixed(1)} kJ/kg`},
+        ...(st
+          ? [
+              {label: 'Inlet (s₁, h₁)', value: `${st.s1.toFixed(2)}, ${st.h1.toFixed(0)}`},
+              {label: 'Actual (s₂, h₂)', value: `${st.s2.toFixed(2)}, ${st.h2.toFixed(0)}`},
+            ]
+          : []),
+      ]
+    : [];
+
   return (
     <ChartFrame
       title="Mollier Diagram (h–s Steam Expansion)"
       subtitle="Specific enthalpy vs. specific entropy across saturation dome and turbine expansion path"
       finePrintTitle="Mollier Expansion Geometry"
       finePrintBody={finePrint}
+      finePrintDataValues={
+        st
+          ? [
+              {label: 'Inlet h₁ / s₁', value: `${st.h1.toFixed(1)} kJ/kg · ${st.s1.toFixed(3)}`},
+              {label: 'Isentropic h₂s', value: `${st.h2s.toFixed(1)} kJ/kg`},
+              {label: 'Actual h₂', value: `${st.h2.toFixed(1)} kJ/kg`},
+              {
+                label: 'Exhaust x₂',
+                value: st.x2 !== null ? `${(st.x2 * 100).toFixed(2)}%` : `${st.t2C.toFixed(1)} °C`,
+              },
+            ]
+          : undefined
+      }
       crosshairReadout={readout}
       legend={
         <>
@@ -290,6 +317,16 @@ export function MollierChart({result, finePrint}: MollierChartProps) {
           Specific Enthalpy h (kJ/kg)
         </text>
       </svg>
+      {cursor && (
+        <ChartCursorTooltip
+          svgX={cursor.svgX}
+          svgY={cursor.svgY}
+          viewWidth={W}
+          viewHeight={H}
+          title="Mollier h–s Probe"
+          rows={cursorTooltipRows}
+        />
+      )}
     </ChartFrame>
   );
 }

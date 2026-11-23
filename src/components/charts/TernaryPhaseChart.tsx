@@ -1,5 +1,10 @@
 import type {TernaryComp, TernaryResult} from '../../engines/ternaryPhase';
-import {ChartFrame, pointsToPolyline, useSvgCrosshair} from './ChartPrimitives';
+import {
+  ChartCursorTooltip,
+  ChartFrame,
+  pointsToPolyline,
+  useSvgCrosshair,
+} from './ChartPrimitives';
 
 interface TernaryPhaseChartProps {
   result: TernaryResult;
@@ -50,12 +55,35 @@ export function TernaryPhaseChart({result, finePrint}: TernaryPhaseChartProps) {
   const vB = baryToXY({a: 0, b: 1, c: 0});
   const vC = baryToXY({a: 0, b: 0, c: 1});
 
+  const cursorTooltipRows = cursorBary
+    ? [
+        {label: 'A (Carrier)', value: `${(cursorBary.a * 100).toFixed(1)}%`},
+        {label: 'B (Solute)', value: `${(cursorBary.b * 100).toFixed(1)}%`},
+        {label: 'C (Solvent)', value: `${(cursorBary.c * 100).toFixed(1)}%`},
+      ]
+    : [];
+
   return (
     <ChartFrame
       title="Equilateral Ternary Phase Diagram (A–B–C)"
       subtitle="Barycentric miscibility envelope, conjugate tie-lines, and phase split"
       finePrintTitle="Ternary Barycentric Coordinates"
       finePrintBody={finePrint}
+      finePrintDataValues={
+        result.mixture
+          ? [
+              {
+                label: 'Feed (A/B/C)',
+                value: `${(result.mixture.a * 100).toFixed(1)}% / ${(result.mixture.b * 100).toFixed(1)}% / ${(result.mixture.c * 100).toFixed(1)}%`,
+              },
+              {label: 'Phase Regime', value: result.regime ?? '—'},
+              {
+                label: 'Plait Point B',
+                value: `${(result.plaitPoint.b * 100).toFixed(1)}%`,
+              },
+            ]
+          : undefined
+      }
       crosshairReadout={readout}
       legend={
         <>
@@ -71,7 +99,7 @@ export function TernaryPhaseChart({result, finePrint}: TernaryPhaseChartProps) {
         </>
       }
     >
-      <div className="mx-auto max-w-[560px]">
+      <div className="relative mx-auto max-w-[560px]">
         <svg
           viewBox={`0 0 ${W} ${H}`}
           role="img"
@@ -212,6 +240,16 @@ export function TernaryPhaseChart({result, finePrint}: TernaryPhaseChartProps) {
             C · Solvent (100%)
           </text>
         </svg>
+        {cursor && cursorBary && (
+          <ChartCursorTooltip
+            svgX={cursor.svgX}
+            svgY={cursor.svgY}
+            viewWidth={W}
+            viewHeight={H}
+            title="Ternary Composition Probe"
+            rows={cursorTooltipRows}
+          />
+        )}
       </div>
     </ChartFrame>
   );

@@ -1,6 +1,7 @@
 import {useCallback, useState} from 'react';
 import type {MouseEvent, ReactNode} from 'react';
 import {FinePrintTooltip} from '../FinePrintTooltip';
+import type {TooltipDataValue} from '../FinePrintTooltip';
 
 export interface Margin {
   top: number;
@@ -95,11 +96,72 @@ export function useSvgCrosshair(
   return {cursor, onMouseMove, onMouseLeave};
 }
 
+interface ChartCursorTooltipProps {
+  svgX: number;
+  svgY: number;
+  viewWidth: number;
+  viewHeight: number;
+  title?: string;
+  rows: TooltipDataValue[];
+}
+
+export function ChartCursorTooltip({
+  svgX,
+  svgY,
+  viewWidth,
+  viewHeight,
+  title,
+  rows,
+}: ChartCursorTooltipProps) {
+  if (rows.length === 0) return null;
+
+  const leftPct = (svgX / viewWidth) * 100;
+  const topPct = (svgY / viewHeight) * 100;
+  const flipX = svgX > viewWidth * 0.6;
+  const flipY = svgY > viewHeight * 0.65;
+
+  const transformParts = [
+    flipX ? 'translateX(calc(-100% - 12px))' : 'translateX(12px)',
+    flipY ? 'translateY(calc(-100% - 12px))' : 'translateY(12px)',
+  ];
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        left: `${leftPct}%`,
+        top: `${topPct}%`,
+        transform: transformParts.join(' '),
+      }}
+      className="pointer-events-none absolute z-30 min-w-[170px] max-w-[240px] rounded-md border border-slate-700 bg-slate-900/95 px-2.5 py-2 text-left text-[11px] text-slate-100 shadow-md"
+    >
+      {title && (
+        <div className="mb-1 border-b border-slate-700/80 pb-1 font-mono text-[10px] font-semibold text-sky-300">
+          {title}
+        </div>
+      )}
+      <div className="space-y-0.5">
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className="flex items-baseline justify-between gap-3 font-mono text-[11px] tabular-nums"
+          >
+            <span className="text-slate-400">{row.label}</span>
+            <span className="font-semibold text-amber-300">{row.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface ChartFrameProps {
   title: string;
   subtitle: string;
   finePrintTitle: string;
   finePrintBody: string;
+  finePrintDataValues?: TooltipDataValue[];
   crosshairReadout?: string | null;
   controls?: ReactNode;
   legend?: ReactNode;
@@ -111,6 +173,7 @@ export function ChartFrame({
   subtitle,
   finePrintTitle,
   finePrintBody,
+  finePrintDataValues,
   crosshairReadout,
   controls,
   legend,
@@ -125,6 +188,7 @@ export function ChartFrame({
             <FinePrintTooltip
               title={finePrintTitle}
               content={finePrintBody}
+              dataValues={finePrintDataValues}
               align="left"
             />
           </div>

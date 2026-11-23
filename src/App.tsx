@@ -68,6 +68,14 @@ export default function App() {
                   <FinePrintTooltip
                     title={`${activeMeta.title} — Governing Basis`}
                     content={activeMeta.chartFinePrint}
+                    dataValues={
+                      evaluation.valid
+                        ? outputs.slice(0, 4).map((o) => ({
+                            label: o.symbol || o.label,
+                            value: `${o.formatted}${o.unit ? ` ${o.unit}` : ''}`,
+                          }))
+                        : [{label: 'State', value: 'Out of physical bounds'}]
+                    }
                     align="right"
                   />
                 </div>

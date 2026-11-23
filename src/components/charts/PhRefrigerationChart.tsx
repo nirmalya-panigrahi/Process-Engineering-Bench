@@ -1,5 +1,6 @@
 import type {PhResult} from '../../engines/refrigeration';
 import {
+  ChartCursorTooltip,
   ChartFrame,
   createInverseLinearMapper,
   createInverseLogMapper,
@@ -55,12 +56,45 @@ export function PhRefrigerationChart({result, finePrint}: PhRefrigerationChartPr
         }))
       : [];
 
+  const cursorTooltipRows = cursor
+    ? (() => {
+        const hVal = invX(cursor.svgX);
+        const pVal = invY(cursor.svgY);
+        let nearestLabel: string | null = null;
+        let nearestVals: string | null = null;
+        let minDist = 28;
+        for (const pt of result.cyclePoints) {
+          const d = Math.hypot(mapX(pt.h) - cursor.svgX, mapY(pt.pKpa) - cursor.svgY);
+          if (d < minDist) {
+            minDist = d;
+            nearestLabel = pt.label ?? null;
+            nearestVals = `${pt.h.toFixed(1)} kJ/kg @ ${pt.pKpa.toFixed(0)} kPa`;
+          }
+        }
+        return [
+          {label: 'Enthalpy h', value: `${hVal.toFixed(1)} kJ/kg`},
+          {label: 'Pressure P', value: `${pVal.toFixed(0)} kPa`},
+          ...(nearestLabel && nearestVals
+            ? [{label: `State ${nearestLabel.split(' ')[0]}`, value: nearestVals}]
+            : []),
+        ];
+      })()
+    : [];
+
   return (
     <ChartFrame
       title="Pressure–Enthalpy (P–h) Refrigeration Cycle"
       subtitle="Log-pressure vs. enthalpy saturation dome with 4-state vapor compression loop"
       finePrintTitle="Vapor-Compression P–h Cycle"
       finePrintBody={finePrint}
+      finePrintDataValues={
+        result.cyclePoints.length === 4
+          ? result.cyclePoints.map((pt) => ({
+              label: pt.label ?? 'State',
+              value: `${pt.h.toFixed(1)} kJ/kg · ${pt.pKpa.toFixed(0)} kPa`,
+            }))
+          : undefined
+      }
       crosshairReadout={readout}
       legend={
         <>
@@ -226,6 +260,16 @@ export function PhRefrigerationChart({result, finePrint}: PhRefrigerationChartPr
           Pressure P (kPa, Log Scale)
         </text>
       </svg>
+      {cursor && (
+        <ChartCursorTooltip
+          svgX={cursor.svgX}
+          svgY={cursor.svgY}
+          viewWidth={W}
+          viewHeight={H}
+          title="P–h Diagram Probe"
+          rows={cursorTooltipRows}
+        />
+      )}
     </ChartFrame>
   );
 }

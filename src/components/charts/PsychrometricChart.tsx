@@ -1,6 +1,11 @@
 import {useState} from 'react';
-import type {PsychroResult} from '../../engines/psychrometric';
 import {
+  moistAirEnthalpyKjKg,
+  saturationVaporPressureKpa,
+  type PsychroResult,
+} from '../../engines/psychrometric';
+import {
+  ChartCursorTooltip,
   ChartFrame,
   createInverseLinearMapper,
   createLinearMapper,
@@ -46,12 +51,45 @@ export function PsychrometricChart({result, finePrint}: PsychrometricChartProps)
   const sp = result.statePoint;
   const clampedW = sp ? Math.min(45, Math.max(0, sp.wGkg)) : 0;
 
+  const cursorTemp = cursor ? invX(cursor.svgX) : null;
+  const cursorW = cursor ? Math.max(0, invY(cursor.svgY)) : null;
+  const cursorTooltipRows =
+    cursorTemp !== null && cursorW !== null
+      ? (() => {
+          const wKg = cursorW / 1000;
+          const pAtm =
+            sp && sp.wKgKg > 0
+              ? (sp.vaporPressureKpa * (0.621945 + sp.wKgKg)) / sp.wKgKg
+              : 101.325;
+          const pv = (wKg * pAtm) / (0.621945 + wKg);
+          const pws = saturationVaporPressureKpa(cursorTemp);
+          const rh = Math.min(100, Math.max(0, (pv / pws) * 100));
+          const h = moistAirEnthalpyKjKg(cursorTemp, wKg);
+          return [
+            {label: 'Dry-Bulb T_db', value: `${cursorTemp.toFixed(1)} °C`},
+            {label: 'Humidity W', value: `${cursorW.toFixed(2)} g/kg`},
+            {label: 'Rel. Humidity', value: `${rh.toFixed(1)} %`},
+            {label: 'Enthalpy h', value: `${h.toFixed(1)} kJ/kg`},
+          ];
+        })()
+      : [];
+
   return (
     <ChartFrame
       title="Psychrometric Chart (W vs. T_db)"
       subtitle="Moist air saturation envelope, relative humidity contours, and enthalpy lines"
       finePrintTitle="Psychrometric Chart Geometry"
       finePrintBody={finePrint}
+      finePrintDataValues={
+        sp
+          ? [
+              {label: 'Dry-Bulb T_db', value: `${sp.tDb.toFixed(1)} °C`},
+              {label: 'Wet-Bulb T_wb', value: `${sp.tWb.toFixed(2)} °C`},
+              {label: 'Dew Point T_dp', value: `${sp.tDp.toFixed(2)} °C`},
+              {label: 'Humidity W', value: `${sp.wGkg.toFixed(2)} g/kg`},
+            ]
+          : undefined
+      }
       crosshairReadout={readout}
       controls={
         <button
@@ -316,6 +354,16 @@ export function PsychrometricChart({result, finePrint}: PsychrometricChartProps)
           Humidity Ratio W (g/kg_da)
         </text>
       </svg>
+      {cursor && (
+        <ChartCursorTooltip
+          svgX={cursor.svgX}
+          svgY={cursor.svgY}
+          viewWidth={W}
+          viewHeight={H}
+          title="Probe Air State"
+          rows={cursorTooltipRows}
+        />
+      )}
     </ChartFrame>
   );
 }

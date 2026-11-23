@@ -1,5 +1,6 @@
 import type {McCabeThieleResult} from '../../engines/mccabeThiele';
 import {
+  ChartCursorTooltip,
   ChartFrame,
   createInverseLinearMapper,
   createLinearMapper,
@@ -32,12 +33,37 @@ export function McCabeThieleChart({result, finePrint}: McCabeThieleChartProps) {
 
   const ticks = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
 
+  const cursorTooltipRows = cursor
+    ? (() => {
+        const xVal = Math.max(0, Math.min(1, invX(cursor.svgX)));
+        const yVal = Math.max(0, Math.min(1, invY(cursor.svgY)));
+        // Interpolate VLE y*(x) from vleCurve
+        const idx = Math.min(result.vleCurve.length - 1, Math.max(0, Math.round(xVal * (result.vleCurve.length - 1))));
+        const yEq = result.vleCurve[idx]?.y ?? xVal;
+        return [
+          {label: 'Liquid x', value: xVal.toFixed(3)},
+          {label: 'Vapor y', value: yVal.toFixed(3)},
+          {label: 'Equilibrium y*(x)', value: yEq.toFixed(3)},
+        ];
+      })()
+    : [];
+
   return (
     <ChartFrame
       title="McCabe–Thiele Binary Distillation Diagram"
       subtitle="VLE equilibrium curve, operating lines, q-line, and stepped equilibrium stages"
       finePrintTitle="McCabe–Thiele Construction"
       finePrintBody={finePrint}
+      finePrintDataValues={
+        result.valid
+          ? [
+              ...result.outputs.map((o) => ({
+                label: o.symbol,
+                value: `${o.formatted}${o.unit ? ` ${o.unit}` : ''}`,
+              })),
+            ]
+          : undefined
+      }
       crosshairReadout={readout}
       legend={
         <>
@@ -56,7 +82,7 @@ export function McCabeThieleChart({result, finePrint}: McCabeThieleChartProps) {
         </>
       }
     >
-      <div className="mx-auto max-w-[560px]">
+      <div className="relative mx-auto max-w-[560px]">
         <svg
           viewBox={`0 0 ${W} ${H}`}
           role="img"
@@ -197,6 +223,16 @@ export function McCabeThieleChart({result, finePrint}: McCabeThieleChartProps) {
             Vapor Mole Fraction y (Light Key)
           </text>
         </svg>
+        {cursor && (
+          <ChartCursorTooltip
+            svgX={cursor.svgX}
+            svgY={cursor.svgY}
+            viewWidth={W}
+            viewHeight={H}
+            title="Column Stage Probe"
+            rows={cursorTooltipRows}
+          />
+        )}
       </div>
     </ChartFrame>
   );
